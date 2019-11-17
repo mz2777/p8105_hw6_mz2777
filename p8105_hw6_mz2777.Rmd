@@ -9,6 +9,7 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(MASS)
+library(modelr)
 ```
 
 # Problem 1
@@ -30,34 +31,90 @@ birthweight = birthweight %>%
     malform = factor(malform, levels = c(0, 1), labels = c("absent", "present")),
     mrace = factor(mrace, levels = c(1, 2, 3, 4, 8, 9), labels = c("White", "Black", "Asian", "Puerto Rican", "Other", "Unknown"))
   )
-# check for missing data
+```
+
+### check for missing data
+The result shows that there is no missing data.
+```{r}
 sum(is.na(birthweight))
 ```
 
+### Roughly Fitting
+By roughly fitting a model, we can see that there are many coefficients that does not pass the t test. Therefore, we need to select some main variable to fit another model.
+```{r}
+rough_model = lm(bwt ~ babysex + bhead + blength + delwt + fincome + frace + gaweeks + malform + menarche + mheight + momage + mrace + parity + pnumlbw + pnumsga + ppbmi + ppwt + smoken + wtgain, data = birthweight)
+summary(rough_model)
+```
+
+
+### Stepwise Regression
+
+I use the stepwise regression to select predictors though this method have many limitations. Finally, we get the model with babysex, bhead, blength, delwt, fincome, gaweeks, mheight, mrace, parity, ppwt and smoken as predictors.
 
 ```{r}
 # Stepwise Regression
-
-fit = lm(bwt ~ babysex + bhead + blength + delwt + fincome + frace + gaweeks + malform + menarche + mheight + momage + mrace + parity + pnumlbw + pnumsga + ppbmi + ppwt + smoken + wtgain, data = birthweight)
-step = stepAIC(fit, direction="both")
+step = stepAIC(rough_model, direction="both")
 step$anova # display results
 ```
 
+### Model Summary
+
+By looking at model summary, the R-squared value of 0.72 is not bad. The F-value is highly significant implying that all the explanatory variables together significantly explain the birth weight.
+
+However, coming to the individual regression coefficients, it is seen that two predictors ('fincome' and 'mracePuerto Rican') are significant only at 10 % level of significance.
+
 ```{r}
-my_model = lm(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + 
+# my model
+model = lm(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + 
     mheight + mrace + parity + ppwt + smoken, data = birthweight)
+summary(model)
+```
+
+### Diagnostics
+
+A plot of model residuals against fitted values shows that in general, residuals and fitted values are independent which means that the predictors we select can explaint almost all informations among birth weight and its determinants.
+```{r}
 # Diagnostics
 birthweight %>% 
-  modelr::add_residuals(my_model) %>% 
-  modelr::add_predictions(my_model) %>% 
+  modelr::add_residuals(model) %>% 
+  modelr::add_predictions(model) %>% 
   ggplot(aes(x = pred, y = resid)) +
   geom_point(alpha = .6)
 ```
 
 ### Comparision
-
+From the violin plot, we can see that the model I choose generally have the smallest rmse, and the model using length at birth and gestational age as predictors have the biggest rmse.
 ```{r}
+cv_df = 
+  crossv_mc(birthweight, 100) 
 
+cv_df =
+  cv_df %>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble))
+
+
+cv_df = 
+  cv_df %>% 
+  mutate(my_model = map(train, ~lm(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + mheight + mrace + parity + ppwt + smoken, data = .x)),
+         main_effect_model  = map(train, ~lm(bwt ~ blength + gaweeks, data = .x)),
+         interaction_model  = map(train, ~lm(bwt ~ babysex + bhead + blength + babysex * bhead + bhead * blength + babysex * blength + babysex * bhead * blength, data = .x))) %>% 
+  mutate(rmse_my = map2_dbl(my_model, test, ~rmse(model = .x, data = .y)),
+         rmse_main_effect = map2_dbl(main_effect_model, test, ~rmse(model = .x, data = .y)),
+         rmse_interaction = map2_dbl(interaction_model, test, ~rmse(model = .x, data = .y)))
 ```
 
+```{r}
+cv_df %>% 
+  dplyr::select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model", 
+    values_to = "rmse",
+    names_prefix = "rmse_") %>% 
+  mutate(model = fct_inorder(model)) %>% 
+  ggplot(aes(x = model, y = rmse)) + geom_violin()
+```
 
+# Problem 2
