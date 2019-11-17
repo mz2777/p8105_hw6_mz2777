@@ -1,0 +1,47 @@
+---
+title: "Homework 6"
+author: "Mengyu Zhang"
+date: "11/16/2019"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(MASS)
+```
+
+# Problem 1
+
+### Clean Data
+
+```{r}
+# import data
+birthweight = read_csv("data/birthweight.csv") %>% 
+  janitor::clean_names()
+
+# taking a quick look
+glimpse(birthweight)
+
+birthweight = birthweight %>% 
+  mutate(
+    babysex = factor(babysex, levels = c(1, 2), labels = c("male", "female")),
+    frace = factor(frace, levels = c(1, 2, 3, 4, 8, 9), labels = c("White", "Black", "Asian", "Puerto Rican", "Other", "Unknown")),
+    malform = factor(malform, levels = c(0, 1), labels = c("absent", "present")),
+    mrace = factor(mrace, levels = c(1, 2, 3, 4, 8, 9), labels = c("White", "Black", "Asian", "Puerto Rican", "Other", "Unknown"))
+  )
+# check for missing data
+sum(is.na(birthweight))
+```
+
+
+```{r}
+# Stepwise Regression
+
+fit = lm(bwt ~ babysex + bhead + blength + delwt + fincome + frace + gaweeks + malform + menarche + mheight + momage + mrace + parity + pnumlbw + pnumsga + ppbmi + ppwt + smoken + wtgain, data = birthweight)
+step = stepAIC(fit, direction="both")
+step$anova # display results
+```
+
+
+
