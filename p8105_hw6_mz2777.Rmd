@@ -43,5 +43,21 @@ step = stepAIC(fit, direction="both")
 step$anova # display results
 ```
 
+```{r}
+my_model = lm(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + 
+    mheight + mrace + parity + ppwt + smoken, data = birthweight)
+# Diagnostics
+birthweight %>% 
+  modelr::add_residuals(my_model) %>% 
+  modelr::add_predictions(my_model) %>% 
+  ggplot(aes(x = pred, y = resid)) +
+  geom_point(alpha = .6)
+```
+
+### Comparision
+
+```{r}
+
+```
 
 
