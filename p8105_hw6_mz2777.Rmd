@@ -118,3 +118,51 @@ cv_df %>%
 ```
 
 # Problem 2
+
+### Get and clean data
+```{r}
+weather_df = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(id, USW00094728 = "CentralPark_NY"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  dplyr::select(name, id, everything())
+```
+### Interval of adjusted R-square
+```{r}
+# Adjusted R-square
+weather_df %>% 
+  modelr::bootstrap(n = 5000) %>% 
+  mutate(models = map(strap, ~lm(tmax ~ tmin, data = .x) ),
+         results = map(models, broom::glance)) %>% 
+  dplyr::select(-strap, -models) %>% 
+  unnest(results) %>% 
+  dplyr::select(adj.r.squared) %>% 
+  apply(2, quantile, probs = c(0.025,0.975))
+```
+
+### Interval of log(beta0*beta1)
+```{r}
+# log(beta0*beta1)
+weather_df %>% 
+  modelr::bootstrap(n = 5000) %>% 
+  mutate(models = map(strap, ~lm(tmax ~ tmin, data = .x) ),
+         results = map(models, broom::tidy)) %>% 
+  dplyr::select(-strap, -models) %>% 
+  unnest(results) %>% 
+  dplyr::select(-(std.error:p.value)) %>% 
+  pivot_wider(
+    names_from = term,
+    values_from = estimate
+  ) %>% 
+  janitor::clean_names() %>% 
+  mutate(log_beta = log(intercept*tmin)) %>%
+  dplyr::select(log_beta) %>% 
+  apply(2, quantile, probs = c(0.025,0.975))
+```
+
