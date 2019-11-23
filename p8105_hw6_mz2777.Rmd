@@ -136,12 +136,24 @@ weather_df =
 ### Interval of adjusted R-square
 ```{r}
 # Adjusted R-square
-weather_df %>% 
+R_square = weather_df %>% 
   modelr::bootstrap(n = 5000) %>% 
   mutate(models = map(strap, ~lm(tmax ~ tmin, data = .x) ),
          results = map(models, broom::glance)) %>% 
   dplyr::select(-strap, -models) %>% 
-  unnest(results) %>% 
+  unnest(results)
+```
+The shape of the distribution of ajusted R-square is like a bell, which means the ajusted R-square follows normal distribution when we repeatedly fit the model. 
+```{r}
+# The distribution
+R_square %>% 
+  ggplot(aes(x = adj.r.squared)) +
+  geom_density()
+```
+The confidence interval is 
+```{r}
+# 95% confidence interval
+R_square_quantile = R_square %>% 
   dplyr::select(adj.r.squared) %>% 
   apply(2, quantile, probs = c(0.025,0.975))
 ```
@@ -149,7 +161,7 @@ weather_df %>%
 ### Interval of log(beta0*beta1)
 ```{r}
 # log(beta0*beta1)
-weather_df %>% 
+beta = weather_df %>% 
   modelr::bootstrap(n = 5000) %>% 
   mutate(models = map(strap, ~lm(tmax ~ tmin, data = .x) ),
          results = map(models, broom::tidy)) %>% 
@@ -161,7 +173,20 @@ weather_df %>%
     values_from = estimate
   ) %>% 
   janitor::clean_names() %>% 
-  mutate(log_beta = log(intercept*tmin)) %>%
+  mutate(log_beta = log(intercept*tmin)) 
+```
+From the plot we can see that log(beta0*beta1) follows normal distribution when we repeatedly fit the model. 
+```{r}
+# The distribution
+beta %>% 
+  ggplot(aes(x = log_beta)) +
+  geom_density()
+```
+
+The confidence interval is 
+```{r}
+# 95% confidence interval
+beta %>%
   dplyr::select(log_beta) %>% 
   apply(2, quantile, probs = c(0.025,0.975))
 ```
