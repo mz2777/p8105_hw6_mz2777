@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(MASS)
 library(modelr)
+library(viridis)
 ```
 
 # Problem 1
@@ -21,9 +22,6 @@ library(modelr)
 birthweight = read_csv("data/birthweight.csv") %>% 
   janitor::clean_names()
 
-# taking a quick look
-glimpse(birthweight)
-
 birthweight = birthweight %>% 
   mutate(
     babysex = factor(babysex, levels = c(1, 2), labels = c("male", "female")),
@@ -31,27 +29,32 @@ birthweight = birthweight %>%
     malform = factor(malform, levels = c(0, 1), labels = c("absent", "present")),
     mrace = factor(mrace, levels = c(1, 2, 3, 4, 8, 9), labels = c("White", "Black", "Asian", "Puerto Rican", "Other", "Unknown"))
   )
+
+# taking a quick look
+glimpse(birthweight)
 ```
 
 ### check for missing data
 The result shows that there is no missing data.
 ```{r}
-sum(is.na(birthweight))
+anyNA(birthweight)
 ```
 
 ### Roughly Fitting
-By roughly fitting a model, we can see that there are many coefficients that does not pass the t test. Therefore, we need to select some main variable to fit another model.
+By roughly fitting a model, we can see that there are many coefficients that does not pass the t test. Plus, variables pnumlbw, pnumsga do not have estimates, because the values of these three variables are all zero. Therefore, we need to delete some vairiables and select some main variables to fit another model.
 ```{r}
 rough_model = lm(bwt ~ babysex + bhead + blength + delwt + fincome + frace + gaweeks + malform + menarche + mheight + momage + mrace + parity + pnumlbw + pnumsga + ppbmi + ppwt + smoken + wtgain, data = birthweight)
-summary(rough_model)
+rough_model %>% 
+  broom::tidy()
 ```
 
 
 ### Stepwise Regression
 
-I use the stepwise regression to select predictors though this method have many limitations. Finally, we get the model with babysex, bhead, blength, delwt, fincome, gaweeks, mheight, mrace, parity, ppwt and smoken as predictors.
+I use the stepwise regression with AIC criterion to select predictors though this method have many limitations. Finally, we get the model with babysex, bhead, blength, delwt, fincome, gaweeks, mheight, mrace, parity, ppwt and smoken as predictors.
 
 ```{r}
+rough_model = lm(bwt ~ babysex + bhead + blength + delwt + fincome + frace + gaweeks + malform + menarche + mheight + momage + mrace + parity + ppbmi + ppwt + smoken + wtgain, data = birthweight)
 # Stepwise Regression
 step = stepAIC(rough_model, direction="both")
 step$anova # display results
@@ -67,12 +70,13 @@ However, coming to the individual regression coefficients, it is seen that two p
 # my model
 model = lm(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + 
     mheight + mrace + parity + ppwt + smoken, data = birthweight)
-summary(model)
+model %>% 
+  broom::tidy()
 ```
 
 ### Diagnostics
 
-A plot of model residuals against fitted values shows that in general, residuals and fitted values are independent which means that the predictors we select can explaint almost all informations among birth weight and its determinants.
+A plot of model residuals against fitted values shows that in general, residuals and fitted values are independent, expect for lower fitted values, there is a negative curvilinear trend. Plus, some points have large residuals which might can be improved by centralizing the data.
 ```{r}
 # Diagnostics
 birthweight %>% 
@@ -85,6 +89,7 @@ birthweight %>%
 ### Comparision
 From the violin plot, we can see that the model I choose generally have the smallest rmse, and the model using length at birth and gestational age as predictors have the biggest rmse.
 ```{r}
+set.seed(1)
 cv_df = 
   crossv_mc(birthweight, 100) 
 
@@ -114,7 +119,10 @@ cv_df %>%
     values_to = "rmse",
     names_prefix = "rmse_") %>% 
   mutate(model = fct_inorder(model)) %>% 
-  ggplot(aes(x = model, y = rmse)) + geom_violin()
+  ggplot(aes(x = model, y = rmse, fill = model)) + 
+  geom_violin(alpha = .6) + 
+  scale_fill_viridis(discrete=TRUE) +
+  theme_bw()
 ```
 
 # Problem 2
@@ -133,6 +141,7 @@ weather_df =
     tmax = tmax / 10) %>%
   dplyr::select(name, id, everything())
 ```
+
 ### Interval of adjusted R-square
 ```{r}
 # Adjusted R-square
@@ -148,7 +157,8 @@ The shape of the distribution of ajusted R-square is like a bell, which means th
 # The distribution
 R_square %>% 
   ggplot(aes(x = adj.r.squared)) +
-  geom_density()
+  geom_density(color="darkblue", fill="lightblue", alpha = .6) + 
+  theme_bw()
 ```
 The confidence interval is 
 ```{r}
@@ -180,7 +190,8 @@ From the plot we can see that log(beta0*beta1) follows normal distribution when 
 # The distribution
 beta %>% 
   ggplot(aes(x = log_beta)) +
-  geom_density()
+  geom_density(color="darkblue", fill="lightblue", alpha = .6) + 
+  theme_bw()
 ```
 
 The confidence interval is 
